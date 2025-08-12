@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クラスルーム理解度ダッシュボード Final</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f4f7f9; color: #333; }
+        .top-bar { background-color: white; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        #connectButton { font-size: 1.1rem; padding: 0.7rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; color: white; background-color: #007bff; transition: background-color 0.2s; }
+        #connectButton:hover { background-color: #0056b3; }
+        .hidden { display: none; }
+        .main-container { display: flex; padding: 1.5rem; gap: 1.5rem; align-items: flex-start; }
+        .left-column { flex: 3; display: flex; flex-direction: column; gap: 1.5rem; }
+        .right-column { flex: 2; }
+        .selector-container { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .student-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem; }
+        .student-button { font-size: 1rem; padding: 0.7rem; border-radius: 8px; border: 2px solid #ccc; cursor: pointer; background-color: #e9ecef; color: #495057; transition: all 0.2s; }
+        .student-button.active { background-color: #cfe2ff; color: #084298; border-color: #0d6efd; font-weight: bold; }
+        .seating-chart-container { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .seating-chart { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem; }
+        .seat { padding: 1rem; border-radius: 10px; font-weight: bold; text-align: center; background-color: #e9ecef; color: #495057; transition: background-color 0.3s; }
+        .seat.understood { background-color: #198754; color: white; }
+        .seat.not-understood { background-color: #dc3545; color: white; }
+        .log-container { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; max-height: 75vh; }
+        .log-entries { flex-grow: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 1rem; background-color: #f8f9fa; }
+        .log-entry { margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e9ecef; font-size: 0.95rem; }
+        h2 { margin: 0 0 1rem 0; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <button id="connectButton">デバイスに接続</button>
+        <div id="status-log" style="color: #666; margin-top: 0.5rem;"></div>
+    </div>
+    
+    <div id="dashboard" class="main-container hidden">
+        <div class="left-column">
+            <div class="selector-container">
+                <h2>操作する学生を選択</h2>
+                <div id="student-buttons" class="student-buttons"></div>
+            </div>
+            <div class="seating-chart-container">
+                <h2>全体の理解度分布</h2>
+                <div id="seating-chart" class="seating-chart"></div>
+            </div>
+        </div>
+        <div class="right-column log-container">
+            <h2>変更ログ</h2>
+            <div id="log-entries" class="log-entries"></div>
+        </div>
+    </div>
+
+    <script>
+        const STUDENT_COUNT = 8;
+        const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
+        const CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
+
+        const connectButton = document.getElementById('connectButton');
+        const statusLog = document.getElementById('status-log');
+        const dashboard = document.getElementById('dashboard');
+        const studentButtonsContainer = document.getElementById('student-buttons');
+        const seatingChart = document.getElementById('seating-chart');
+        const logEntries = document.getElementById('log-entries');
+        
+        const decoder = new TextDecoder('utf-8');
+        let bleCharacteristic;
+        let selectedStudent = 1;
+        let seatElements = [null];
+        let buttonElements = [null];
+
+        function initializeDashboard() {
+            for (let i = 1; i <= STUDENT_COUNT; i++) {
+                const seat = document.createElement('div');
+                seat.className = 'seat';
+                seat.textContent = `学生 ${i}`;
+                seatingChart.appendChild(seat);
+                seatElements.push(seat);
+
+                const button = document.createElement('button');
+                button.className = 'student-button';
+                button.textContent = `学生 ${i}`;
+                button.addEventListener('click', () => selectStudent(i));
+                studentButtonsContainer.appendChild(button);
+                buttonElements.push(button);
+            }
+            selectStudent(1);
+        }
+
+        function selectStudent(studentId) {
+            selectedStudent = studentId;
+            buttonElements.forEach((btn, index) => {
+                if(index > 0) btn.classList.toggle('active', index === studentId);
+            });
+        }
+        
+        function addLogEntry(studentId, status) {
+            const time = new Date().toLocaleTimeString();
+            const statusText = (status === "ON") ? "理解" : "未理解";
+            const color = (status === "ON") ? "#198754" : "#dc3545";
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `[${time}] <b>学生${studentId}</b> の状態が <span style="color:${color}; font-weight:bold;">${statusText}</span> に変更`;
+            logEntries.insertBefore(entry, logEntries.firstChild);
+        }
+
+        connectButton.addEventListener('click', async () => {
+            if (!navigator.bluetooth) {
+                statusLog.textContent = 'お使いのブラウザまたは接続方法ではBluetoothが利用できません。HTTPS環境のChrome等で開いてください。';
+                return;
+            }
+            try {
+                statusLog.textContent = 'デバイスを検索中...';
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: "Final Switch" }],
+                    optionalServices: [SERVICE_UUID] 
+                });
+
+                statusLog.textContent = '接続中...';
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                bleCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                await bleCharacteristic.startNotifications();
+                bleCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+                
+                connectButton.classList.add('hidden');
+                statusLog.textContent = '';
+                dashboard.classList.remove('hidden');
+            } catch (error) {
+                console.error('接続エラー:', error);
+                statusLog.textContent = `エラー: ${error.message}`;
+            }
+        });
+
+        function handleNotifications(event) {
+            const status = decoder.decode(event.target.value);
+            const seat = seatElements[selectedStudent];
+            if (seat) {
+                seat.classList.remove('understood', 'not-understood');
+                seat.classList.add(status === "ON" ? 'understood' : 'not-understood');
+                addLogEntry(selectedStudent, status);
+            }
+        }
+
+        function onDisconnected() {
+            connectButton.classList.remove('hidden');
+            statusLog.textContent = '切断されました。再接続するにはページを更新してください。';
+            dashboard.classList.add('hidden');
+            if (bleCharacteristic) {
+                bleCharacteristic.removeEventListener('characteristicvaluechanged', handleNotifications);
+                bleCharacteristic = null;
+            }
+        }
+
+        initializeDashboard();
+    </script>
+</body>
+</html>
