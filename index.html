@@ -52,7 +52,24 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
     <script>
+        // Firebase設定
+        const firebaseConfig = {
+          apiKey: "AIzaSyAJS7fvbYnQCFx4MTrJCeBndLqxFasEYkw",
+          authDomain: "eng-des.firebaseapp.com",
+          projectId: "eng-des",
+          storageBucket: "eng-des.firebasestorage.app",
+          messagingSenderId: "303584945724",
+          appId: "1:303584945724:web:91bfeb0d6bf328319c0539"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         const STUDENT_COUNT = 8;
         const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
         const CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
@@ -94,15 +111,41 @@
                 if(index > 0) btn.classList.toggle('active', index === studentId);
             });
         }
-        
+
+        function saveLogToFirestore(studentId, status) {
+            db.collection("logs").add({
+                studentId: studentId,
+                status: status,
+                timestamp: Date.now()
+            }).catch(err => console.error("Firestore保存エラー:", err));
+        }
+
+        function loadLogEntriesFromFirestore() {
+            db.collection("logs")
+              .orderBy("timestamp", "desc")
+              .limit(20)
+              .onSnapshot(snapshot => {
+                  logEntries.innerHTML = "";
+                  snapshot.forEach(doc => {
+                      const data = doc.data();
+                      const time = new Date(data.timestamp).toLocaleTimeString();
+                      const statusText = data.status === "ON" ? "理解" : "未理解";
+                      const color = data.status === "ON" ? "#198754" : "#dc3545";
+                      const entry = document.createElement('div');
+                      entry.className = 'log-entry';
+                      entry.innerHTML = `[${time}] <b>学生${data.studentId}</b> の状態が <span style="color:${color}; font-weight:bold;">${statusText}</span> に変更`;
+                      logEntries.appendChild(entry);
+                  });
+              });
+        }
+
         function addLogEntry(studentId, status) {
-            const time = new Date().toLocaleTimeString();
-            const statusText = (status === "ON") ? "理解" : "未理解";
-            const color = (status === "ON") ? "#198754" : "#dc3545";
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.innerHTML = `[${time}] <b>学生${studentId}</b> の状態が <span style="color:${color}; font-weight:bold;">${statusText}</span> に変更`;
-            logEntries.insertBefore(entry, logEntries.firstChild);
+            const seat = seatElements[studentId];
+            if (seat) {
+                seat.classList.remove('understood', 'not-understood');
+                seat.classList.add(status === "ON" ? 'understood' : 'not-understood');
+            }
+            saveLogToFirestore(studentId, status);
         }
 
         connectButton.addEventListener('click', async () => {
@@ -136,12 +179,7 @@
 
         function handleNotifications(event) {
             const status = decoder.decode(event.target.value);
-            const seat = seatElements[selectedStudent];
-            if (seat) {
-                seat.classList.remove('understood', 'not-understood');
-                seat.classList.add(status === "ON" ? 'understood' : 'not-understood');
-                addLogEntry(selectedStudent, status);
-            }
+            addLogEntry(selectedStudent, status);
         }
 
         function onDisconnected() {
@@ -155,6 +193,7 @@
         }
 
         initializeDashboard();
+        loadLogEntriesFromFirestore();
     </script>
 </body>
 </html>
