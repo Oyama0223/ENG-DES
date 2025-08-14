@@ -3,97 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>クラスルーム理解度ダッシュボード Final</title>
+    <title>ClassLink-V4.1</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f4f7f9; color: #333; }
-        .top-bar { background-color: white; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
-        #connectButton { font-size: 1.1rem; padding: 0.7rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; color: white; background-color: #007bff; transition: background-color 0.2s; }
-        #connectButton:hover { background-color: #0056b3; }
+        .top-bar { background-color: white; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .top-bar h1 { font-size: 1.5rem; margin: 0; }
+        .top-bar-controls { display: flex; align-items: center; gap: 1rem; }
+        .top-bar-controls button, .modal-footer button { font-size: 1rem; padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; color: white; }
+        #connectButton { background-color: #0d6efd; }
+        #timerButton { background-color: #198754; }
+        #dataButton, #saveGraphButton { background-color: #6c757d; }
         .hidden { display: none; }
-        .main-container { display: flex; padding: 1.5rem; gap: 1.5rem; align-items: flex-start; }
-        .left-column { flex: 3; display: flex; flex-direction: column; gap: 1.5rem; }
-        .right-column { flex: 2; }
-        .selector-container { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .student-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem; }
-        .student-button { font-size: 1rem; padding: 0.7rem; border-radius: 8px; border: 2px solid #ccc; cursor: pointer; background-color: #e9ecef; color: #495057; transition: all 0.2s; }
+        .main-container { display: flex; padding: 1.5rem; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+        .column { display: flex; flex-direction: column; gap: 1.5rem; }
+        .left-column { flex: 1; min-width: 300px; }
+        .right-column { flex: 3; min-width: 500px; }
+        .card { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .student-buttons { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5rem; margin-top: 1rem; }
+        .student-button { font-size: 1rem; padding: 0.7rem; border-radius: 8px; border: 2px solid #ccc; cursor: pointer; background-color: #e9ecef; }
         .student-button.active { background-color: #cfe2ff; color: #084298; border-color: #0d6efd; font-weight: bold; }
-        .seating-chart-container { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .seating-chart { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem; }
-        .seat { padding: 1rem; border-radius: 10px; font-weight: bold; text-align: center; background-color: #e9ecef; color: #495057; transition: background-color 0.3s; }
-        .seat.understood { background-color: #198754; color: white; }
-        .seat.not-understood { background-color: #dc3545; color: white; }
-        .log-container { background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; max-height: 75vh; }
-        .log-entries { flex-grow: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 1rem; background-color: #f8f9fa; }
-        .log-entry { margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e9ecef; font-size: 0.95rem; }
+        /* ▼▼▼ 座席表のレイアウトを3列固定に変更 ▼▼▼ */
+        .seating-chart { display: grid; grid-template-columns: repeat(3, 28%); gap: 1rem; margin-top: 1rem; }
+        .seat { border-radius: 10px; text-align: center; background-color: #e9ecef; color: #495057; transition: all 0.3s; padding: 1rem; }
+        .seat-name { font-weight: bold; font-size: 1rem; margin-bottom: 0.5rem; }
+        .seat-level { font-size: 2rem; font-weight: bold; line-height: 1; }
+        .canvas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .canvas-wrapper { border: 1px solid #ddd; background-color: #fff; border-radius: 5px; padding: 0.5rem; text-align: center; }
+        .canvas-wrapper canvas { max-width: 100%; height: auto; }
+        .log-container { max-height: 75vh; }
+        .log-entries { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 1rem; background-color: #f8f9fa; }
         h2 { margin: 0 0 1rem 0; }
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 2rem; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: 12px; position: relative; }
+        .modal-footer { margin-top: 1.5rem; text-align: center; }
+        .modal-close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        #callModal .modal-content { max-width: 500px; text-align: center; background-color: #fff3cd; }
+        #callMessage { font-size: 1.5rem; font-weight: bold; color: #664d03; }
+        .graph-area { margin-top: 1.5rem; }
+        .graph-row { display: flex; align-items: center; margin-bottom: 0.5rem; }
+        .graph-label { width: 80px; font-weight: bold; flex-shrink: 0; }
+        .graph-bar-container { flex-grow: 1; height: 30px; background-color: #e9ecef; display: flex; border: 1px solid #ccc; border-radius: 5px; overflow: hidden; }
+        .graph-segment { height: 100%; }
+        .time-axis-container { position: relative; height: 20px; margin-top: 5px; flex-grow: 1; }
+        .time-axis-label { position: absolute; bottom: 0; font-size: 0.8em; color: #666; transform: translateX(-50%); }
     </style>
 </head>
 <body>
-
     <div class="top-bar">
-        <button id="connectButton">デバイスに接続</button>
-        <div id="status-log" style="color: #666; margin-top: 0.5rem;"></div>
+        <h1>ClassLink</h1>
+        <div class="top-bar-controls">
+            <span id="timer" style="font-size: 1.5rem; font-weight: bold;">00:00</span>
+            <button id="timerButton">授業を開始</button>
+            <button id="dataButton">授業データ</button>
+            <button id="connectButton">デバイスに接続</button>
+        </div>
     </div>
-    
     <div id="dashboard" class="main-container hidden">
-        <div class="left-column">
-            <div class="selector-container">
-                <h2>操作する学生を選択</h2>
-                <div id="student-buttons" class="student-buttons"></div>
-            </div>
-            <div class="seating-chart-container">
-                <h2>全体の理解度分布</h2>
-                <div id="seating-chart" class="seating-chart"></div>
-            </div>
+        <div class="column left-column">
+            <div class="card"><h2>操作する学生</h2><div id="student-buttons" class="student-buttons"></div></div>
+            <div class="card log-container"><h2>変更ログ</h2><div id="log-entries" class="log-entries"></div></div>
         </div>
-        <div class="right-column log-container">
-            <h2>変更ログ</h2>
-            <div id="log-entries" class="log-entries"></div>
+        <div class="column right-column">
+            <div class="card"><h2>全体の理解度</h2><div id="seating-chart" class="seating-chart"></div></div>
+            <div class="card"><h2>個別キャンバス</h2><div id="canvas-grid" class="canvas-grid"></div></div>
         </div>
     </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <div id="dataModal" class="modal">
+      <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div id="captureArea">
+            <h2>授業データ分析</h2>
+            <p>総授業時間: <b id="modal-total-time">00:00</b></p>
+            <div id="graph-area" class="graph-area"></div>
+        </div>
+        <div class="modal-footer">
+            <button id="saveGraphButton">グラフを画像として保存</button>
+        </div>
+      </div>
+    </div>
+    <div id="callModal" class="modal">
+        <div class="modal-content">
+            <h2>✋ 呼び出し</h2>
+            <p id="callMessage">学生が助けを求めています。</p>
+        </div>
+    </div>
 
     <script>
-        // Firebase設定
-        const firebaseConfig = {
-          apiKey: "AIzaSyAJS7fvbYnQCFx4MTrJCeBndLqxFasEYkw",
-          authDomain: "eng-des.firebaseapp.com",
-          projectId: "eng-des",
-          storageBucket: "eng-des.firebasestorage.app",
-          messagingSenderId: "303584945724",
-          appId: "1:303584945724:web:91bfeb0d6bf328319c0539"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
+    document.addEventListener('DOMContentLoaded', () => {
         const STUDENT_COUNT = 8;
         const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
-        const CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
-
+        const METER_CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
+        const CANVAS_CHARACTERISTIC_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
+        const CALL_SWITCH_CHARACTERISTIC_UUID = "19b10003-e8f2-537e-4f6c-d104768a1214";
+        
         const connectButton = document.getElementById('connectButton');
-        const statusLog = document.getElementById('status-log');
         const dashboard = document.getElementById('dashboard');
         const studentButtonsContainer = document.getElementById('student-buttons');
         const seatingChart = document.getElementById('seating-chart');
         const logEntries = document.getElementById('log-entries');
-        
+        const canvasGrid = document.getElementById('canvas-grid');
+        const timerDisplay = document.getElementById('timer');
+        const timerButton = document.getElementById('timerButton');
+        const dataButton = document.getElementById('dataButton');
+        const dataModal = document.getElementById('dataModal');
+        const modalClose = dataModal.querySelector('.modal-close');
+        const modalTotalTime = document.getElementById('modal-total-time');
+        const graphArea = document.getElementById('graph-area');
+        const saveGraphButton = document.getElementById('saveGraphButton');
+        const captureArea = document.getElementById('captureArea');
+        const callModal = document.getElementById('callModal');
+        const callMessage = document.getElementById('callMessage');
+
         const decoder = new TextDecoder('utf-8');
-        let bleCharacteristic;
         let selectedStudent = 1;
-        let seatElements = [null];
-        let buttonElements = [null];
+        let buttonElements = [null], seatElements = [null], canvasContexts = [null];
+        let lastReceivedLevel = Array(STUDENT_COUNT + 1).fill(-1);
+        let timerInterval, elapsedSeconds = 0, isTimerRunning = false;
+        let graphData = {};
+        let receivedData = "", receiveTimeout;
 
         function initializeDashboard() {
             for (let i = 1; i <= STUDENT_COUNT; i++) {
                 const seat = document.createElement('div');
                 seat.className = 'seat';
-                seat.textContent = `学生 ${i}`;
+                seat.innerHTML = `<div class="seat-name">学生 ${i}</div><div class="seat-level">--</div>`;
                 seatingChart.appendChild(seat);
                 seatElements.push(seat);
+
+                const canvasWrapper = document.createElement('div');
+                canvasWrapper.className = 'canvas-wrapper';
+                canvasWrapper.innerHTML = `<div class="seat-name">学生 ${i}</div><canvas width="160" height="120"></canvas>`;
+                canvasGrid.appendChild(canvasWrapper);
+                canvasContexts.push(canvasWrapper.querySelector('canvas').getContext('2d'));
 
                 const button = document.createElement('button');
                 button.className = 'student-button';
@@ -101,99 +143,268 @@
                 button.addEventListener('click', () => selectStudent(i));
                 studentButtonsContainer.appendChild(button);
                 buttonElements.push(button);
+                
+                graphData[i] = [];
             }
             selectStudent(1);
         }
 
         function selectStudent(studentId) {
             selectedStudent = studentId;
-            buttonElements.forEach((btn, index) => {
-                if(index > 0) btn.classList.toggle('active', index === studentId);
-            });
+            buttonElements.forEach((btn, index) => btn && btn.classList.toggle('active', index === studentId));
         }
+        
+        const getLevelColor = (level) => {
+            if (level > 66) return '#198754';
+            if (level > 33) return '#ffc107';
+            return '#dc3545';
+        };
 
-        function saveLogToFirestore(studentId, status) {
-            db.collection("logs").add({
-                studentId: studentId,
-                status: status,
-                timestamp: Date.now()
-            }).catch(err => console.error("Firestore保存エラー:", err));
-        }
+        const getLevelZone = (level) => {
+            if (level === -1) return -1;
+            if (level > 66) return 2;
+            if (level > 33) return 1;
+            return 0;
+        };
 
-        function loadLogEntriesFromFirestore() {
-            db.collection("logs")
-              .orderBy("timestamp", "desc")
-              .limit(20)
-              .onSnapshot(snapshot => {
-                  logEntries.innerHTML = "";
-                  snapshot.forEach(doc => {
-                      const data = doc.data();
-                      const time = new Date(data.timestamp).toLocaleTimeString();
-                      const statusText = data.status === "ON" ? "理解" : "未理解";
-                      const color = data.status === "ON" ? "#198754" : "#dc3545";
-                      const entry = document.createElement('div');
-                      entry.className = 'log-entry';
-                      entry.innerHTML = `[${time}] <b>学生${data.studentId}</b> の状態が <span style="color:${color}; font-weight:bold;">${statusText}</span> に変更`;
-                      logEntries.appendChild(entry);
-                  });
-              });
-        }
-
-        function addLogEntry(studentId, status) {
+        function updateStudentStatus(studentId, level) {
+            lastReceivedLevel[studentId] = level;
             const seat = seatElements[studentId];
-            if (seat) {
-                seat.classList.remove('understood', 'not-understood');
-                seat.classList.add(status === "ON" ? 'understood' : 'not-understood');
+            if (!seat) return;
+
+            const levelDisplay = seat.querySelector('.seat-level');
+            levelDisplay.textContent = level;
+            seat.style.backgroundColor = getLevelColor(level);
+            seat.style.color = (level > 33 && level < 67) ? 'black' : 'white';
+
+            const studentGraphData = graphData[studentId] || [];
+            const lastGraphPoint = studentGraphData.length > 0 ? studentGraphData[studentGraphData.length - 1] : null;
+            const lastGraphZone = lastGraphPoint ? getLevelZone(lastGraphPoint.level) : -1;
+            const currentZone = getLevelZone(level);
+            
+            if (isTimerRunning && currentZone !== lastGraphZone) {
+                addLog(`<b>学生${studentId}</b> の理解度が <b>${level}</b> に変更`);
+                graphData[studentId].push({ level: level, time: elapsedSeconds });
             }
-            saveLogToFirestore(studentId, status);
         }
 
-        connectButton.addEventListener('click', async () => {
-            if (!navigator.bluetooth) {
-                statusLog.textContent = 'お使いのブラウザまたは接続方法ではBluetoothが利用できません。HTTPS環境のChrome等で開いてください。';
-                return;
-            }
-            try {
-                statusLog.textContent = 'デバイスを検索中...';
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: "Final Switch" }],
-                    optionalServices: [SERVICE_UUID] 
-                });
+        function addLog(message) {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.innerHTML = `[${time}] ${message}`;
+            logEntries.insertBefore(entry, logEntries.firstChild);
+        }
 
-                statusLog.textContent = '接続中...';
-                device.addEventListener('gattserverdisconnected', onDisconnected);
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                bleCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-                await bleCharacteristic.startNotifications();
-                bleCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+        timerButton.addEventListener('click', () => {
+            if (isTimerRunning) {
+                isTimerRunning = false;
+                clearInterval(timerInterval);
+                timerButton.textContent = '授業を開始';
+                timerButton.style.backgroundColor = '#198754';
+                addLog(`授業終了 (総時間: ${formatTime(elapsedSeconds)})`);
+            } else {
+                isTimerRunning = true;
+                elapsedSeconds = 0;
+                logEntries.innerHTML = '';
                 
-                connectButton.classList.add('hidden');
-                statusLog.textContent = '';
-                dashboard.classList.remove('hidden');
-            } catch (error) {
-                console.error('接続エラー:', error);
-                statusLog.textContent = `エラー: ${error.message}`;
+                for(let i=1; i<=STUDENT_COUNT; i++) {
+                    graphData[i] = [];
+                    if(lastReceivedLevel[i] !== -1) {
+                        graphData[i].push({ level: lastReceivedLevel[i], time: 0 });
+                        addLog(`<b>学生${i}</b> の初期理解度は <b>${lastReceivedLevel[i]}</b>`);
+                    }
+                }
+                
+                updateTimerDisplay();
+                timerButton.textContent = '授業を終了';
+                timerButton.style.backgroundColor = '#dc3545';
+                addLog('授業を開始しました');
+                timerInterval = setInterval(() => {
+                    elapsedSeconds++;
+                    updateTimerDisplay();
+                }, 1000);
             }
         });
 
-        function handleNotifications(event) {
-            const status = decoder.decode(event.target.value);
-            addLogEntry(selectedStudent, status);
+        const formatTime = (seconds) => {
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        };
+
+        const updateTimerDisplay = () => timerDisplay.textContent = formatTime(elapsedSeconds);
+
+        dataButton.addEventListener('click', () => {
+            modalTotalTime.textContent = formatTime(elapsedSeconds);
+            generateGraphs();
+            dataModal.style.display = 'block';
+        });
+
+        modalClose.addEventListener('click', () => dataModal.style.display = 'none');
+        window.addEventListener('click', (event) => {
+            if (event.target == dataModal) dataModal.style.display = 'none';
+        });
+
+        saveGraphButton.addEventListener('click', () => {
+            html2canvas(captureArea, {
+                backgroundColor: '#ffffff',
+                onclone: (document) => { document.getElementById('captureArea').style.padding = '1rem'; }
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `授業データグラフ_${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        });
+
+        function generateGraphs() {
+            graphArea.innerHTML = '';
+            const totalDuration = elapsedSeconds === 0 ? 1 : elapsedSeconds;
+            for (let i = 1; i <= STUDENT_COUNT; i++) {
+                const row = document.createElement('div');
+                row.className = 'graph-row';
+                const label = document.createElement('div');
+                label.className = 'graph-label';
+                label.textContent = `学生 ${i}`;
+                const barContainer = document.createElement('div');
+                barContainer.className = 'graph-bar-container';
+                const studentData = graphData[i];
+                if (studentData.length > 0) {
+                    let lastTime = 0;
+                    studentData.forEach(dataPoint => {
+                        const segment = document.createElement('div');
+                        segment.className = 'graph-segment';
+                        const duration = dataPoint.time - lastTime;
+                        if(duration > 0) {
+                            segment.style.width = `${(duration / totalDuration) * 100}%`;
+                            segment.style.backgroundColor = getLevelColor(dataPoint.level);
+                            barContainer.appendChild(segment);
+                        }
+                        lastTime = dataPoint.time;
+                    });
+                    const lastDataPoint = studentData[studentData.length - 1];
+                    if (lastTime < totalDuration) {
+                        const lastSegment = document.createElement('div');
+                        lastSegment.className = 'graph-segment';
+                        lastSegment.style.width = `${((totalDuration - lastTime) / totalDuration) * 100}%`;
+                        lastSegment.style.backgroundColor = getLevelColor(lastDataPoint.level);
+                        barContainer.appendChild(lastSegment);
+                    }
+                }
+                row.appendChild(label);
+                row.appendChild(barContainer);
+                graphArea.appendChild(row);
+            }
+            const axisRow = document.createElement('div');
+            axisRow.className = 'graph-row';
+            axisRow.innerHTML = `<div class="graph-label"></div><div class="time-axis-container"></div>`;
+            const timeAxisContainer = axisRow.querySelector('.time-axis-container');
+            const startLabel = document.createElement('span');
+            startLabel.className = 'time-axis-label';
+            startLabel.textContent = '0m';
+            startLabel.style.left = '0%';
+            startLabel.style.transform = 'translateX(0)';
+            timeAxisContainer.appendChild(startLabel);
+            const tickCount = Math.floor(totalDuration / 300); 
+            for (let i = 1; i <= tickCount; i++) {
+                const tickLabel = document.createElement('span');
+                tickLabel.className = 'time-axis-label';
+                tickLabel.textContent = i * 5 + 'm';
+                const position = (i * 300 / totalDuration) * 100;
+                tickLabel.style.left = `${position}%`;
+                timeAxisContainer.appendChild(tickLabel);
+            }
+            graphArea.appendChild(axisRow);
+        }
+
+        connectButton.addEventListener('click', async () => {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ filters: [{ name: "ESP32-Hybrid-Device" }], optionalServices: [SERVICE_UUID] });
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+
+                const meterCharacteristic = await service.getCharacteristic(METER_CHARACTERISTIC_UUID);
+                await meterCharacteristic.startNotifications();
+                meterCharacteristic.addEventListener('characteristicvaluechanged', handleMeterNotifications);
+                
+                const canvasCharacteristic = await service.getCharacteristic(CANVAS_CHARACTERISTIC_UUID);
+                await canvasCharacteristic.startNotifications();
+                canvasCharacteristic.addEventListener('characteristicvaluechanged', handleCanvasNotifications);
+
+                const callSwitchCharacteristic = await service.getCharacteristic(CALL_SWITCH_CHARACTERISTIC_UUID);
+                await callSwitchCharacteristic.startNotifications();
+                callSwitchCharacteristic.addEventListener('characteristicvaluechanged', handleCallSwitchNotifications);
+
+                connectButton.classList.add('hidden');
+                dashboard.classList.remove('hidden');
+                addLog('デバイスに接続しました。');
+            } catch (error) { 
+                console.error("Web Bluetooth 接続エラー:", error);
+                alert("デバイスに接続できませんでした。実行環境の注意点を確認してください。");
+            }
+        });
+
+        function handleMeterNotifications(event) {
+            const level = parseInt(decoder.decode(event.target.value), 10);
+            if (!isNaN(level)) updateStudentStatus(selectedStudent, level);
+        }
+        
+        function handleCallSwitchNotifications(event) {
+            const value = decoder.decode(event.target.value);
+            if (value === '1') {
+                callMessage.textContent = `学生 ${selectedStudent} が助けを求めています。`;
+                callModal.style.display = 'block';
+                addLog(`<b>学生 ${selectedStudent}</b> が呼び出しています`);
+            } else {
+                callModal.style.display = 'none';
+            }
+        }
+
+        function handleCanvasNotifications(event) {
+            clearTimeout(receiveTimeout);
+            receivedData += decoder.decode(event.target.value);
+            receiveTimeout = setTimeout(() => {
+                addLog(`<b>学生${selectedStudent}</b> の描画データを受信`);
+                drawPoints(selectedStudent, receivedData);
+                receivedData = "";
+            }, 250);
+        }
+        
+        function drawPoints(studentId, dataString) {
+            const ctx = canvasContexts[studentId];
+            if (!ctx) return;
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            const points = dataString.split(';');
+            ctx.fillStyle = '#000000';
+            for (const point of points) {
+                if (point.length > 0) {
+                    const coords = point.split(',').map(Number);
+                    if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+                        const x = coords[0] * (ctx.canvas.width / 320);
+                        const y = coords[1] * (ctx.canvas.height / 240);
+                        ctx.beginPath();
+                        ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
+            }
         }
 
         function onDisconnected() {
             connectButton.classList.remove('hidden');
-            statusLog.textContent = '切断されました。再接続するにはページを更新してください。';
             dashboard.classList.add('hidden');
-            if (bleCharacteristic) {
-                bleCharacteristic.removeEventListener('characteristicvaluechanged', handleNotifications);
-                bleCharacteristic = null;
+            addLog('デバイスから切断されました。');
+            if (isTimerRunning) {
+                isTimerRunning = false;
+                clearInterval(timerInterval);
+                timerButton.textContent = '授業を開始';
+                timerButton.style.backgroundColor = '#198754';
             }
         }
 
         initializeDashboard();
-        loadLogEntriesFromFirestore();
+    });
     </script>
 </body>
 </html>
